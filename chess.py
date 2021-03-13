@@ -53,14 +53,13 @@ class ChessBot:
                     if self.board[i][j][1] == 'pawn':
                         valid_moves += (find_pawn_moves(self.colour, self.board, i, j))
                     if self.board[i][j][1] == 'rook':
-                        valid_moves += (find_rook_moves(self.colour, self.board, i, j))
+                        valid_moves += (find_piece_moves(self.colour, self.board, i, j, 'rook'))
                     if self.board[i][j][1] == 'knight':
                         valid_moves += (find_knight_moves(self.colour, self.board, i, j))
                     if self.board[i][j][1] == 'bishop':
-                        valid_moves += (find_bishop_moves(self.colour, self.board, i, j))
+                        valid_moves += (find_piece_moves(self.colour, self.board, i, j, 'bishop'))
                     if self.board[i][j][1] == 'queen':
-                        valid_moves += (find_rook_moves(self.colour, self.board, i, j))
-                        valid_moves += (find_bishop_moves(self.colour, self.board, i, j))
+                        valid_moves += (find_piece_moves(self.colour, self.board, i, j, 'queen'))
                     if self.board[i][j][1] == 'king':
                         valid_moves += (find_king_moves(self.colour, self.board, i, j))
 
@@ -198,126 +197,30 @@ def find_pawn_moves(colour, board, i, j):
     return valid_moves
 
 
-def find_rook_moves(colour, board, i, j):
+def find_piece_moves(colour, board, i, j, piece):
+    if piece == "rook":
+        directions = [(0, -1),  (0, 1), (-1, 0), (1, 0)]
+    elif piece == "bishop":
+        directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+    else:
+        directions = [(0, -1),  (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]
+
     valid_moves = []
-    # move left
-    jj = j - 1
-    while jj >= 1:
-        if board[i][jj] == 'E':
-            move = board[0][j] + str(i) + board[0][jj] + str(i)
-            valid_moves.append(move)
-        elif board[i][jj][0] == colour:
-            break
-        else:
-            move = board[0][j] + str(i) + board[0][jj] + str(i)
-            valid_moves.append(move)
-            break
-        jj -= 1
-
-    jj = j + 1
-    while jj <= 8:
-        if board[i][jj] == 'E':
-            move = board[0][j] + str(i) + board[0][jj] + str(i)
-            valid_moves.append(move)
-        elif board[i][jj][0] == colour:
-            break
-        else:
-            move = board[0][j] + str(i) + board[0][jj] + str(i)
-            valid_moves.append(move)
-            break
-        jj += 1
-
-    ii = i - 1
-    while ii >= 0:
-        if board[ii][j] == 'E':
-            move = board[0][j] + str(i) + board[0][j] + str(ii)
-            valid_moves.append(move)
-        elif board[ii][j][0] == colour:
-            break
-        else:
-            move = board[0][j] + str(i) + board[0][j] + str(ii)
-            valid_moves.append(move)
-            break
-        ii -= 1
-
-    ii = i + 1
-    while ii <= 8:
-        if board[ii][j] == 'E':
-            move = board[0][j] + str(i) + board[0][j] + str(ii)
-            valid_moves.append(move)
-        elif board[ii][j][0] == colour:
-            break
-        else:
-            move = board[0][j] + str(i) + board[0][j] + str(ii)
-            valid_moves.append(move)
-            break
-        ii += 1
-
-    return valid_moves
-
-
-def find_bishop_moves(colour, board, i, j):
-    valid_moves = []
-    jj = j - 1
-    ii = i - 1
-    while jj >= 1 and ii >= 1:
-        if board[ii][jj] == 'E':
-            move = board[0][j] + str(i) + board[0][jj] + str(ii)
-            valid_moves.append(move)
-        elif board[ii][jj][0] == colour:
-            break
-        else:
-            move = board[0][j] + str(i) + board[0][jj] + str(ii)
-            valid_moves.append(move)
-            break
-        jj -= 1
-        ii -= 1
-
-    jj = j - 1
-    ii = i + 1
-    while jj >= 1 and ii <= 8:
-        if board[ii][jj] == 'E':
-            move = board[0][j] + str(i) + board[0][jj] + str(ii)
-            valid_moves.append(move)
-        elif board[ii][jj][0] == colour:
-            break
-        else:
-            move = board[0][j] + str(i) + board[0][jj] + str(ii)
-            valid_moves.append(move)
-            break
-        jj -= 1
-        ii += 1
-
-    jj = j + 1
-    ii = i - 1
-    while jj <= 8 and ii >= 1:
-        if board[ii][jj] == 'E':
-            move = board[0][j] + str(i) + board[0][jj] + str(ii)
-            valid_moves.append(move)
-        elif board[ii][jj][0] == colour:
-            break
-        else:
-            move = board[0][j] + str(i) + board[0][jj] + str(ii)
-            valid_moves.append(move)
-            break
-        jj += 1
-        ii -= 1
-
-    jj = j + 1
-    ii = i + 1
-    while jj <= 8 and ii <= 8:
-        if board[ii][jj] == 'E':
-            move = board[0][j] + str(i) + board[0][jj] + str(ii)
-            valid_moves.append(move)
-        elif board[ii][jj][0] == colour:
-            break
-        else:
-            move = board[0][j] + str(i) + board[0][jj] + str(ii)
-            valid_moves.append(move)
-            break
-        jj += 1
-        ii += 1
-
+    for direction in directions:
+        ii = direction[0]
+        jj = direction[1]
+        while 1 <= ii <= 8 and 1 <= jj <= 8:
+            if board[ii][jj] == 'E':
+                move = board[0][j] + str(i) + board[0][jj] + str(ii)
+                valid_moves.append(move)
+            elif board[ii][jj][0] == colour:
+                break
+            else:
+                move = board[0][j] + str(i) + board[0][jj] + str(ii)
+                valid_moves.append(move)
+                break
+            ii += direction[0]
+            jj += direction[1]
     return valid_moves
 
 
