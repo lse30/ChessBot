@@ -68,174 +68,92 @@ class ChessBot:
 
 
 def check_for_checks(i, j, board, colour):
-    """checks to see in the king in is check"""
+    """
+    checks to see in the king in is check
+    -Check if any pawns attack the king first as it is not possible to create a double check involving a pawn.
+    -Check knights, then horizontal/vertical then diagonals
+    """
 
-    # all the squares that a piece could be moved to to block a check
-
-    blocking_squares = []
-    check = False
-
-    # checks horizontal
-
-    temp = set()
-    jj = j - 1
-    while jj >= 1:
-        if board[i][jj] == 'E':
-            temp.add((i, jj))
-            jj -= 1
-        elif board[i][jj][0] == colour:
-            break
-        elif board[i][jj][1] in ['pawn', 'king', 'knight', 'bishop']:
-            break
-        else:
-            temp.add((i, jj))
-            print(i, jj)
-            check = True
-            break
-    if not check:
-        temp = set()
-        jj = j + 1
-        while jj <= 8:
-            if board[i][jj] == 'E':
-                temp.add((i, jj))
-                jj += 1
-            elif board[i][jj][0] == colour:
-                break
-            elif board[i][jj][1] in ['pawn', 'king', 'knight', 'bishop']:
-                break
-            else:
-                temp.add((i, jj))
-                print(i, jj)
-                check = True
-                break
-
-    # checks up and down
-
-    if not check:
-        temp = set()
-        ii = i - 1
-        while ii >= 1:
-            if board[ii][j] == 'E':
-                temp.add((ii, j))
-                ii -= 1
-            elif board[ii][j][0] == colour:
-                break
-            elif board[ii][j][1] in ['pawn', 'king', 'knight', 'bishop']:
-                break
-            else:
-                temp.add((ii, j))
-                print(ii, j)
-                check = True
-                break
-    if not check:
-        temp = set()
-        ii = i + 1
-        while ii <= 8:
-            if board[ii][j] == 'E':
-                temp.add((ii, j))
-                ii += 1
-            elif board[ii][j][0] == colour:
-                break
-            elif board[ii][j][1] in ['pawn', 'king', 'knight', 'bishop']:
-                break
-            else:
-                temp.add((ii, j))
-                print(ii, j)
-                check = True
-                break
-
-    if check:
-        blocking_squares.append(temp)
-        check = False
-
-    # check pawn checks
+    # Check for checks using a pawn.
 
     if colour == "black" and i > 1:
-        if j > 1 and board[i-1][j-1] != 'E' and board[i-1][j-1][0] == 'white' and board[i-1][j-1][1] == 'pawn':
-            check = True
-            print(i - 1, j - 1)
-        if j < 8 and board[i-1][j+1] != 'E' and board[i-1][j+1][0] == 'white' and board[i-1][j+1][1] == 'pawn':
-            check = True
-            print(i - 1, j + 1)
+        if j > 1 and board[i-1][j-1] != 'E' and board[i-1][j-1] == ('white', 'pawn'):
+            return True, (i - 1, j - 1)
+        if j < 8 and board[i-1][j+1] != 'E' and board[i-1][j+1] == ('white', 'pawn'):
+            return True, (i - 1, j + 1)
     elif colour == "white" and i < 8:
-        if j > 1 and board[i+1][j-1] != 'E' and board[i+1][j-1][0] == 'black' and board[i+1][j-1][1] == 'pawn':
-            check = True
-            print(i + 1, j - 1)
-        if j < 8 and board[i+1][j+1] != 'E' and board[i+1][j+1][0] == 'black' and board[i+1][j+1][1] == 'pawn':
-            check = True
-            print(i + 1, j + 1)
+        if j > 1 and board[i+1][j-1] != 'E' and board[i+1][j-1] == ('black', 'pawn'):
+            return True, (i + 1, j - 1)
+        if j < 8 and board[i+1][j+1] != 'E' and board[i+1][j+1] == ('black', 'pawn'):
+            return True, (i + 1, j + 1)
 
-    # checks diagonally
-
-    ii = i + 1
-    jj = j + 1
-    while jj <= 8 and ii <= 8:
-        if board[ii][jj] == 'E':
-            ii += 1
-            jj += 1
-        elif board[ii][jj][0] == colour:
-            break
-        elif board[ii][jj][1] in ['king', 'rook', 'knight',  'pawn']:
-            break
-        else:
-            print(ii, jj)
-            check = True
-            break
-    ii = i - 1
-    jj = j - 1
-    while jj >= 1 and ii >= 1:
-        if board[ii][jj] == 'E':
-            ii -= 1
-            jj -= 1
-        elif board[ii][jj][0] == colour:
-            break
-        elif board[ii][jj][1] in ['king', 'rook', 'knight', 'pawn']:
-            break
-        else:
-            print(ii, jj)
-            check = True
-            break
-    ii = i + 1
-    jj = j - 1
-    while jj <= 8 and ii >= 1:
-        if board[ii][jj] == 'E':
-            ii += 1
-            jj -= 1
-        elif board[ii][jj][0] == colour:
-            break
-        elif board[ii][jj][1] in ['king', 'rook', 'knight', 'pawn']:
-            break
-        else:
-            print(ii, jj)
-            check = True
-            break
-    ii = i - 1
-    jj = j + 1
-    while jj <= 8 and ii >= 1:
-        if board[ii][jj] == 'E':
-            ii -= 1
-            jj += 1
-        elif board[ii][jj][0] == colour:
-            break
-        elif board[ii][jj][1] in ['king', 'rook', 'knight', 'pawn']:
-            break
-        else:
-            print(ii, jj)
-            check = True
-            break
-
+    # available squares that could be used to block the check
+    blocking_squares = []
     # checks knights
-
+    check_k = False
     options = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]
     for move in options:
         ii = i + move[0]
         jj = j + move[1]
         if (1 <= ii <= 8) and (1 <= jj <= 8):
             if board[ii][jj] != 'E' and board[ii][jj][0] != colour and board[ii][jj][1] == 'knight':
-                check = True
-                print(ii, jj)
-    print(blocking_squares)
-    return check
+                check_k = True
+                blocking_squares = [(ii, jj)]
+
+    check_hv = False
+
+    # Checks Horizontal and Vertical positions
+    for combination in [(0, -1),  (0, 1), (-1, 0), (1, 0)]:
+        temp = []
+        ii = i + combination[0]
+        jj = j + combination[1]
+        while 1 <= jj <= 8 and 1 <= ii <= 8:
+            if board[ii][jj] == 'E':
+                temp.append((ii, jj))
+                ii += combination[0]
+                jj += combination[1]
+            elif board[ii][jj][0] == colour:
+                break
+            elif board[ii][jj][1] in ['pawn', 'king', 'knight', 'bishop']:
+                break
+            else:
+                temp.append((ii, jj))
+                check_hv = True
+                break
+        if check_hv:
+            blocking_squares = temp
+            break
+
+    if check_k and check_hv:
+        return True, []
+
+    check_d = False
+    # Checks Diagonals for checks
+    for combination in [(-1, -1),  (-1, 1), (1, -1), (1, 1)]:
+        temp = []
+        ii = i + combination[0]
+        jj = j + combination[1]
+        while 1 <= jj <= 8 and 1 <= ii <= 8:
+            if board[ii][jj] == 'E':
+                temp.append((ii, jj))
+                ii += combination[0]
+                jj += combination[1]
+            elif board[ii][jj][0] == colour:
+                break
+            elif board[ii][jj][1] in ['pawn', 'king', 'knight', 'rook']:
+                break
+            else:
+                temp.append((ii, jj))
+                check_d = True
+                break
+        if check_d:
+            break
+    if (check_k or check_hv) and check_d:
+        return True, []
+    if check_k or check_hv or check_d:
+        return True, blocking_squares
+    else:
+        return False, []
 
 
 def find_pawn_moves(colour, board, i, j):
