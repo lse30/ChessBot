@@ -11,12 +11,14 @@ no pawn promotions
 
 # import random
 
+# Important to remember that you can have multiple queens!!!
+
 WHITE_START = {
     'pawn': [(1, 2), (2, 2), (3, 2), (4, 2), (5, 2), (6, 2), (7, 2), (8, 2)],
     'rook': [(1, 1), (8, 1)],
     'knight': [(2, 1), (7, 1)],
     'bishop': [(3, 1), (6, 1)],
-    'queen': (4, 1),
+    'queen': [(4, 1)],
     'king': (5, 1)
 }
 BLACK_START = {
@@ -24,7 +26,7 @@ BLACK_START = {
     'rook': [(1, 8), (8, 8)],
     'knight': [(2, 8), (7, 8)],
     'bishop': [(3, 8), (6, 8)],
-    'queen': (4, 8),
+    'queen': [(4, 8)],
     'king': (5, 8)
 }
 COORDS = {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8}
@@ -52,39 +54,46 @@ class ChessBot:
 
     def make_move(self, move):
         """moves a piece from one coord to another"""
-        if move[0:2] == self.king:
-            self.king = move[2:]
         move = list(move)
-        piece = self.board[int(move[1])][self.coords[move[0]]]
-        self.board[int(move[1])][self.coords[move[0]]] = 'E'
-        self.board[int(move[3])][self.coords[move[2]]] = piece
-        return
+        piece = self.board[int(move[1])][COORDS[move[0]]]
+        target = self.board[int(move[3])][COORDS[move[2]]]
+        self.board[int(move[1])][COORDS[move[0]]] = 'E'
+        self.board[int(move[3])][COORDS[move[2]]] = piece
+        if piece[0] == self.colour:
+            if piece[1] == 'king':
+                self.positions[piece[1]] = (COORDS[move[2]], int(move[3]))
+            else:
+                old = (COORDS[move[0]], int(move[1]))
+                self.positions[piece[1]].remove(old)
+                self.positions[piece[1]].append((COORDS[move[2]], int(move[3])))
+        elif target != 'E':
+            if target[1] == 'king':
+                print("you've just captured the king!")
+            else:
+                self.positions[target[1]].remove((COORDS[move[2]], int(move[3])))
 
     def find_moves(self):
-        in_check = check_for_checks(int(self.king[1]), self.coords[self.king[0]], self.board, self.colour)
+        in_check, squares = check_for_checks(self.positions['king'], self.board, self.colour)
         print(in_check)
 
         valid_moves = []
-        for i in range(1, 9):
-            for j in range(1, 9):
-                if len(self.board[i][j]) and self.board[i][j][0] == self.colour:
-                    if self.board[i][j][1] == 'pawn':
-                        valid_moves += (find_pawn_moves(self.colour, self.board, i, j))
-                    if self.board[i][j][1] == 'rook':
-                        valid_moves += (find_piece_moves(self.colour, self.board, i, j, 'rook'))
-                    if self.board[i][j][1] == 'knight':
-                        valid_moves += (find_knight_moves(self.colour, self.board, i, j))
-                    if self.board[i][j][1] == 'bishop':
-                        valid_moves += (find_piece_moves(self.colour, self.board, i, j, 'bishop'))
-                    if self.board[i][j][1] == 'queen':
-                        valid_moves += (find_piece_moves(self.colour, self.board, i, j, 'queen'))
-                    if self.board[i][j][1] == 'king':
-                        valid_moves += (find_king_moves(self.colour, self.board, i, j))
+        valid_moves += find_king_moves(self.colour, self.board, self.positions['king'])
+        for position in self.positions['pawn']:
+            valid_moves += (find_pawn_moves(self.colour, self.board, position[1], position[0]))
+        for position in self.positions['knight']:
+            valid_moves += (find_knight_moves(self.colour, self.board, position[1], position[0]))
+        for position in self.positions['rook']:
+            valid_moves += (find_piece_moves(self.colour, self.board, position[1], position[0], 'rook'))
+        for position in self.positions['bishop']:
+            valid_moves += (find_piece_moves(self.colour, self.board, position[1], position[0], 'bishop'))
+        for position in self.positions['queen']:
+            valid_moves += (find_piece_moves(self.colour, self.board, position[1], position[0], 'queen'))
 
+        print(valid_moves)
         return valid_moves
 
 
-def check_for_checks(i, j, board, colour):
+def check_for_checks(king, board, colour):
     """
     checks to see in the king in is check
     -Check if any pawns attack the king first as it is not possible to create a double check involving a pawn.
@@ -92,7 +101,7 @@ def check_for_checks(i, j, board, colour):
     """
 
     # Check for checks using a pawn.
-
+    j, i = king
     if colour == "black" and i > 1:
         if j > 1 and board[i-1][j-1] != 'E' and board[i-1][j-1] == ('white', 'pawn'):
             return True, (i - 1, j - 1)
@@ -255,7 +264,8 @@ def find_knight_moves(colour, board, i, j):
     return valid_moves
 
 
-def find_king_moves(colour, board, i, j):
+def find_king_moves(colour, board, position):
+    j, i = position
     valid_moves = []
     for ii in [-1, 0, 1]:
         for jj in [-1, 0, 1]:
@@ -293,9 +303,9 @@ def set_up_board():
 
 def main():
     game = ChessBot()
-    game.make_move('e8f5')
-    game.make_move('b1e3')
-    # game.make_move('c8d4')
+    game.make_move('e2e4')
+    # game.make_move('d1a5')
+    # game.make_move('g1g3')
     # game.make_move('c1b4')
     # game.make_move('e8c3')
     game.find_moves()
