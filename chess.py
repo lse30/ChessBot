@@ -9,7 +9,7 @@ no pawn promotions
 
 """
 
-# import random
+import random
 
 # Important to remember that you can have multiple queens!!!
 
@@ -29,17 +29,34 @@ BLACK_START = {
     'queen': [(4, 8)],
     'king': (5, 8)
 }
+FEN_CONVERT_DICT = {
+    'r': ('black', 'rook'), 'n': ('black', 'knight'), 'b': ('black', 'bishop'),
+    'q': ('black', 'queen'), 'k': ('black', 'king'), 'p': ('black', 'pawn'),
+    'R': ('white', 'rook'), 'N': ('white', 'knight'), 'B': ('white', 'bishop'),
+    'Q': ('white', 'queen'), 'K': ('white', 'king'), 'P': ('white', 'pawn'),
+}
 COORDS = {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8}
 
 
 class ChessBot:
-    def __init__(self, colour='black'):
-        self.board = set_up_board()
+    def __init__(self, colour='black', FEN_string=None):
+        self.board = set_up_board(FEN_string)
         self.colour = colour
-        if colour == 'black':
-            self.positions = BLACK_START
+        if FEN_string is None:
+            if colour == 'black':
+                self.positions = BLACK_START
+            else:
+                self.positions = WHITE_START
         else:
-            self.positions = WHITE_START
+            self.positions = {'pawn': [], 'rook': [], 'knight': [], 'bishop': [], 'queen': []}
+            for i in range(1, 9):
+                for j in range(1, 9):
+                    if self.board[i][j] != 'E' and self.board[i][j][0] == self.colour:
+                        position = (j, i)
+                        if self.board[i][j][1] == 'king':
+                            self.positions['king'] = position
+                        else:
+                            self.positions[self.board[i][j][1]].append(position)
 
     def __str__(self):
         """displays the current state of the board"""
@@ -54,7 +71,6 @@ class ChessBot:
 
     def make_move(self, move):
         """moves a piece from one coord to another"""
-        move = list(move)
         piece = self.board[int(move[1])][COORDS[move[0]]]
         target = self.board[int(move[3])][COORDS[move[2]]]
         self.board[int(move[1])][COORDS[move[0]]] = 'E'
@@ -74,23 +90,44 @@ class ChessBot:
 
     def find_moves(self):
         in_check, squares = check_for_checks(self.positions['king'], self.board, self.colour)
-        print(in_check)
+        king_moves = find_king_moves(self.colour, self.board, self.positions['king'])
+        if in_check:
+            temp = []
+            for move in king_moves:
+                self.make_move(move)
+                illegal_move = check_for_checks(self.positions['king'], self.board, self.colour)
+                if not illegal_move[0]:
+                    temp.append(move)
+                move_back = move[2:] + move[:2]
+                self.make_move(move_back)
+            king_moves = temp
 
-        valid_moves = []
-        valid_moves += find_king_moves(self.colour, self.board, self.positions['king'])
-        for position in self.positions['pawn']:
-            valid_moves += (find_pawn_moves(self.colour, self.board, position[1], position[0]))
-        for position in self.positions['knight']:
-            valid_moves += (find_knight_moves(self.colour, self.board, position[1], position[0]))
-        for position in self.positions['rook']:
-            valid_moves += (find_piece_moves(self.colour, self.board, position[1], position[0], 'rook'))
-        for position in self.positions['bishop']:
-            valid_moves += (find_piece_moves(self.colour, self.board, position[1], position[0], 'bishop'))
-        for position in self.positions['queen']:
-            valid_moves += (find_piece_moves(self.colour, self.board, position[1], position[0], 'queen'))
+        if in_check and not len(squares):
+            return king_moves
+        else:
+            valid_moves = []
+            for position in self.positions['pawn']:
+                valid_moves += (find_pawn_moves(self.colour, self.board, position[1], position[0]))
+            for position in self.positions['knight']:
+                valid_moves += (find_knight_moves(self.colour, self.board, position[1], position[0]))
+            for position in self.positions['rook']:
+                valid_moves += (find_piece_moves(self.colour, self.board, position[1], position[0], 'rook'))
+            for position in self.positions['bishop']:
+                valid_moves += (find_piece_moves(self.colour, self.board, position[1], position[0], 'bishop'))
+            for position in self.positions['queen']:
+                valid_moves += (find_piece_moves(self.colour, self.board, position[1], position[0], 'queen'))
+            if in_check:
+                temp = []
+                for move in valid_moves:
+                    destination = (int(move[3]), COORDS[move[2]])
+                    if destination in squares:
+                        temp.append(move)
+                valid_moves = temp
 
-        print(valid_moves)
-        return valid_moves
+        if in_check:
+            print("block moves!", valid_moves)
+            print("king moves", king_moves)
+        return valid_moves + king_moves
 
 
 def check_for_checks(king, board, colour):
@@ -104,14 +141,14 @@ def check_for_checks(king, board, colour):
     j, i = king
     if colour == "black" and i > 1:
         if j > 1 and board[i-1][j-1] != 'E' and board[i-1][j-1] == ('white', 'pawn'):
-            return True, (i - 1, j - 1)
+            return True, [(i - 1, j - 1)]
         if j < 8 and board[i-1][j+1] != 'E' and board[i-1][j+1] == ('white', 'pawn'):
-            return True, (i - 1, j + 1)
+            return True, [(i - 1, j + 1)]
     elif colour == "white" and i < 8:
         if j > 1 and board[i+1][j-1] != 'E' and board[i+1][j-1] == ('black', 'pawn'):
-            return True, (i + 1, j - 1)
+            return True, [(i + 1, j - 1)]
         if j < 8 and board[i+1][j+1] != 'E' and board[i+1][j+1] == ('black', 'pawn'):
-            return True, (i + 1, j + 1)
+            return True, [(i + 1, j + 1)]
 
     # available squares that could be used to block the check
     blocking_squares = []
@@ -173,6 +210,7 @@ def check_for_checks(king, board, colour):
                 check_d = True
                 break
         if check_d:
+            blocking_squares = temp
             break
     if (check_k or check_hv) and check_d:
         return True, []
@@ -234,8 +272,8 @@ def find_piece_moves(colour, board, i, j, piece):
 
     valid_moves = []
     for direction in directions:
-        ii = direction[0]
-        jj = direction[1]
+        ii = i + direction[0]
+        jj = j + direction[1]
         while 1 <= ii <= 8 and 1 <= jj <= 8:
             if board[ii][jj] == 'E':
                 move = board[0][j] + str(i) + board[0][jj] + str(ii)
@@ -279,33 +317,55 @@ def find_king_moves(colour, board, position):
     return valid_moves
 
 
-def set_up_board():
-    board = [[0, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']]
-    colour = 'white'
-    order = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook']
-    rank = 1
-    while rank <= 8:
+def set_up_board(FEN_string):
+    board = []
+    if FEN_string is None:
+        board = [[0, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']]
+        colour = 'white'
+        order = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook']
+        rank = 1
+        while rank <= 8:
+            line = [rank]
+            for i in range(1, 9):
+                if rank == 1 or rank == 8:
+                    line.append((colour, order[i-1]))
+                elif rank == 2 or rank == 7:
+                    line.append((colour, 'pawn'))
+                else:
+                    line.append('E')
+            board.append(line)
+            if rank == 2:
+                colour = 'black'
+            rank += 1
+    else:
+        rank = 8
         line = [rank]
-        for i in range(1, 9):
-            if rank == 1 or rank == 8:
-                line.append((colour, order[i-1]))
-            elif rank == 2 or rank == 7:
-                line.append((colour, 'pawn'))
+        for item in FEN_string:
+            if item == ' ':
+                board.append(line)
+                board.append([0, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])
+                board.reverse()
+                return board
+            elif item == '/':
+                board.append(line)
+                rank -= 1
+                line = [rank]
+            elif item in '12345678':
+                for i in range(int(item)):
+                    line.append('E')
             else:
-                line.append('E')
-        board.append(line)
-        if rank == 2:
-            colour = 'black'
-        rank += 1
-
+                line.append(FEN_CONVERT_DICT[item])
     return board
 
 
 def main():
-    game = ChessBot()
-    game.make_move('e2e4')
-    # game.make_move('d1a5')
-    # game.make_move('g1g3')
+    FEN = "rnb1kbnr/p1qpp1pp/1p6/7Q/5p2/4P3/PPPP1PPP/R1B1KBNR b KQkq - 1 5"
+    # FEN = None
+    game = ChessBot(FEN_string=FEN)
+    # print(game)
+    # game.make_move('e8e4')
+    # game.make_move('d1c4')
+    # game.make_move('d8d6')
     # game.make_move('c1b4')
     # game.make_move('e8c3')
     game.find_moves()
@@ -316,7 +376,7 @@ def main():
     #     else:
     #         game.make_move(player_move)
     #         moves = game.find_moves()
-    #
+    #         print(len(moves))
     #         move = random.randint(0, len(moves) - 1)
     #         print(moves[move])
     #         game.make_move(moves[move])
