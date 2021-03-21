@@ -2,8 +2,8 @@
 Just a bot to play check with, ill keep working on it for fun
 might try and build an account for it and see what elo i can get it to.
 
-v0.1.0 makes random moves, cannot see checks yet
-no castles
+v0.2.0 makes random moves, can see checks
+able to  castles
 no en passant
 no pawn promotions
 

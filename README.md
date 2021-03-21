@@ -8,10 +8,12 @@ WIP - initially only makes random moves
 + added checking for checks
 + added FEN imports
 + moves/blocks checks
++ added FEN exports
++ added Castling
 
 TODO
 
-+ add castling, pawn promotions, en passant
++ pawn promotions, en passant
 
 + position evaluations
 
