@@ -13,22 +13,8 @@ import random
 
 # Important to remember that you can have multiple queens!!!
 
-WHITE_START = {
-    'pawn': [(1, 2), (2, 2), (3, 2), (4, 2), (5, 2), (6, 2), (7, 2), (8, 2)],
-    'rook': [(1, 1), (8, 1)],
-    'knight': [(2, 1), (7, 1)],
-    'bishop': [(3, 1), (6, 1)],
-    'queen': [(4, 1)],
-    'king': (5, 1)
-}
-BLACK_START = {
-    'pawn': [(1, 7), (2, 7), (3, 7), (4, 7), (5, 7), (6, 7), (7, 7), (8, 7)],
-    'rook': [(1, 8), (8, 8)],
-    'knight': [(2, 8), (7, 8)],
-    'bishop': [(3, 8), (6, 8)],
-    'queen': [(4, 8)],
-    'king': (5, 8)
-}
+
+FEN_STRING_START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 FEN_CONVERT_DICT = {
     'r': ('black', 'rook'), 'n': ('black', 'knight'), 'b': ('black', 'bishop'),
     'q': ('black', 'queen'), 'k': ('black', 'king'), 'p': ('black', 'pawn'),
@@ -39,24 +25,25 @@ COORDS = {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8}
 
 
 class ChessBot:
-    def __init__(self, colour='black', FEN_string=None):
-        self.board = set_up_board(FEN_string)
+    def __init__(self, colour='black', fen_string=FEN_STRING_START):
+        fen_string = fen_string.split(' ')
+        self.board = set_up_board(fen_string[0])
         self.colour = colour
-        if FEN_string is None:
-            if colour == 'black':
-                self.positions = BLACK_START
-            else:
-                self.positions = WHITE_START
-        else:
-            self.positions = {'pawn': [], 'rook': [], 'knight': [], 'bishop': [], 'queen': []}
-            for i in range(1, 9):
-                for j in range(1, 9):
-                    if self.board[i][j] != 'E' and self.board[i][j][0] == self.colour:
-                        position = (j, i)
-                        if self.board[i][j][1] == 'king':
-                            self.positions['king'] = position
-                        else:
-                            self.positions[self.board[i][j][1]].append(position)
+        self.active_colour = fen_string[1]
+        self.castling_availability = [] if fen_string[2] == '-' else list(fen_string[2])
+        self.en_passant = fen_string[3]
+        # TODO - add half-move clock and full-move number
+        # These are fen_string[4 & 5]
+
+        self.positions = {'pawn': [], 'rook': [], 'knight': [], 'bishop': [], 'queen': []}
+        for i in range(1, 9):
+            for j in range(1, 9):
+                if self.board[i][j] != 'E' and self.board[i][j][0] == self.colour:
+                    position = (j, i)
+                    if self.board[i][j][1] == 'king':
+                        self.positions['king'] = position
+                    else:
+                        self.positions[self.board[i][j][1]].append(position)
 
     def __str__(self):
         """displays the current state of the board"""
@@ -70,6 +57,57 @@ class ChessBot:
         return output
 
     def make_move(self, move):
+        """moves a piece from one coord to another"""
+        piece = self.board[int(move[1])][COORDS[move[0]]]
+        target = self.board[int(move[3])][COORDS[move[2]]]
+        self.board[int(move[1])][COORDS[move[0]]] = 'E'
+        self.board[int(move[3])][COORDS[move[2]]] = piece
+
+        # If king is moved make sure castling is also removed
+        if piece[1] == 'king':
+            if piece[0] == 'white':
+                if 'K' in self.castling_availability:
+                    self.castling_availability.remove('K')
+                if 'Q' in self.castling_availability:
+                    self.castling_availability.remove('Q')
+            else:
+                if 'k' in self.castling_availability:
+                    self.castling_availability.remove('k')
+                if 'q' in self.castling_availability:
+                    self.castling_availability.remove('q')
+            if move == "e1g1":
+                self.make_move("h1f1")
+            elif move == "e1c1":
+                self.make_move("a1d1")
+            elif move == "e8cg8":
+                self.make_move("h8f8")
+            elif move == "e8c8":
+                self.make_move("a8d8")
+
+
+        if piece[1] == 'rook' and move[:2] == 'a1' and 'Q' in self.castling_availability:
+            self.castling_availability.remove('Q')
+        elif piece[1] == 'rook' and move[:2] == 'h1' and 'K' in self.castling_availability:
+            self.castling_availability.remove('Q')
+        elif piece[1] == 'rook' and move[:2] == 'a8' and 'q' in self.castling_availability:
+            self.castling_availability.remove('Q')
+        elif piece[1] == 'rook' and move[:2] == 'h8' and 'k' in self.castling_availability:
+            self.castling_availability.remove('Q')
+
+        if piece[0] == self.colour:
+            if piece[1] == 'king':
+                self.positions[piece[1]] = (COORDS[move[2]], int(move[3]))
+            else:
+                old = (COORDS[move[0]], int(move[1]))
+                self.positions[piece[1]].remove(old)
+                self.positions[piece[1]].append((COORDS[move[2]], int(move[3])))
+        elif target != 'E':
+            if target[1] == 'king':
+                print("you've just captured the king!")
+            else:
+                self.positions[target[1]].remove((COORDS[move[2]], int(move[3])))
+
+    def make_pseudo_move(self, move):
         """moves a piece from one coord to another"""
         piece = self.board[int(move[1])][COORDS[move[0]]]
         target = self.board[int(move[3])][COORDS[move[2]]]
@@ -94,13 +132,16 @@ class ChessBot:
         if in_check:
             temp = []
             for move in king_moves:
-                self.make_move(move)
+                self.make_pseudo_move(move)
                 illegal_move = check_for_checks(self.positions['king'], self.board, self.colour)
                 if not illegal_move[0]:
                     temp.append(move)
                 move_back = move[2:] + move[:2]
-                self.make_move(move_back)
+                self.make_pseudo_move(move_back)
             king_moves = temp
+        else:
+            castling = self.check_castling()
+            king_moves += castling
 
         if in_check and not len(squares):
             return king_moves
@@ -124,10 +165,112 @@ class ChessBot:
                         temp.append(move)
                 valid_moves = temp
 
-        if in_check:
-            print("block moves!", valid_moves)
-            print("king moves", king_moves)
+        # if in_check:
+        #     print("block moves!", valid_moves)
+        #     print("king moves", king_moves)
         return valid_moves + king_moves
+
+    def in_check(self):
+        in_check, squares = check_for_checks(self.positions['king'], self.board, self.colour)
+        return in_check
+
+    def check_castling(self):
+        """
+        check if the pieces haven't moved
+        check there is no pieces blocking the castle
+        check the 2 other squares for checks
+        """
+        output = []
+        if self.colour == 'white':
+            if 'K' in self.castling_availability:
+                if self.squares_empty([(1, 6), (1, 7)]):
+                    if self.castling_king_safety(['e1f1', 'e1g1']):
+                        output.append('e1g1')
+
+            if 'Q' in self.castling_availability:
+                if self.squares_empty([(1, 4), (1, 3), (1, 2)]):
+                    if self.castling_king_safety(['e1d1', 'e1c1']):
+                        output.append('e1c1')
+        else:
+            if 'k' in self.castling_availability:
+                if self.squares_empty([(8, 6), (8, 7)]):
+                    if self.castling_king_safety(['e8f8', 'e8g8']):
+                        output.append('e8g8')
+            if 'q' in self.castling_availability:
+                if self.squares_empty([(8, 4), (8, 3), (8, 2)]):
+                    if self.castling_king_safety(['e8d8', 'e8c8']):
+                        output.append('e8c8')
+        return output
+
+    def squares_empty(self, location_list):
+        for location in location_list:
+            if self.board[location[0]][location[1]] != 'E':
+                return False
+        return True
+
+    def castling_king_safety(self, moves):
+        for move in moves:
+            self.make_pseudo_move(move)
+            if self.in_check():
+                return False
+            move_back = move[2:] + move[:2]
+            self.make_pseudo_move(move_back)
+        return True
+
+    def produce_fen_string(self):
+        """makes a fen string for the current game"""
+        output = ""
+        rank = 8
+        while rank > 0:
+            count = 0
+            for i in range(1, 9):
+                if self.board[rank][i] == 'E':
+                    count += 1
+                else:
+                    if count != 0:
+                        output += str(count)
+                        count = 0
+                    piece = self.board[rank][i]
+                    if piece[0] == 'white':
+                        if piece[1] == 'pawn':
+                            output += 'P'
+                        elif piece[1] == 'rook':
+                            output += 'R'
+                        elif piece[1] == 'knight':
+                            output += 'N'
+                        elif piece[1] == 'bishop':
+                            output += 'B'
+                        elif piece[1] == 'queen':
+                            output += 'Q'
+                        else:
+                            output += 'K'
+                    else:
+                        if piece[1] == 'pawn':
+                            output += 'p'
+                        elif piece[1] == 'rook':
+                            output += 'r'
+                        elif piece[1] == 'knight':
+                            output += 'n'
+                        elif piece[1] == 'bishop':
+                            output += 'b'
+                        elif piece[1] == 'queen':
+                            output += 'q'
+                        else:
+                            output += 'k'
+
+            if count != 0:
+                output += str(count)
+            output += '/'
+            rank -= 1
+        output = output[:-1]
+        output += ' ' + self.active_colour + ' '
+        if self.castling_availability:
+            for item in self.castling_availability:
+                output += item
+        else:
+            output += '-'
+        output += ' ' + self.en_passant
+        return output
 
 
 def check_for_checks(king, board, colour):
@@ -317,69 +460,110 @@ def find_king_moves(colour, board, position):
     return valid_moves
 
 
-def set_up_board(FEN_string):
+def set_up_board(fen_string):
+    """
+    sets up the board based on a given fen_record
+    Note the pieces can be referenced by board[rank][file]
+    where file is a number a = 1, b = 2 etc...
+    """
     board = []
-    if FEN_string is None:
-        board = [[0, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']]
-        colour = 'white'
-        order = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook']
-        rank = 1
-        while rank <= 8:
-            line = [rank]
-            for i in range(1, 9):
-                if rank == 1 or rank == 8:
-                    line.append((colour, order[i-1]))
-                elif rank == 2 or rank == 7:
-                    line.append((colour, 'pawn'))
-                else:
-                    line.append('E')
+    rank = 8
+    line = [rank]
+    for item in fen_string:
+        if item == '/':
             board.append(line)
-            if rank == 2:
-                colour = 'black'
-            rank += 1
-    else:
-        rank = 8
-        line = [rank]
-        for item in FEN_string:
-            if item == ' ':
-                board.append(line)
-                board.append([0, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])
-                board.reverse()
-                return board
-            elif item == '/':
-                board.append(line)
-                rank -= 1
-                line = [rank]
-            elif item in '12345678':
-                for i in range(int(item)):
-                    line.append('E')
-            else:
-                line.append(FEN_CONVERT_DICT[item])
+            rank -= 1
+            line = [rank]
+        elif item in '12345678':
+            for i in range(int(item)):
+                line.append('E')
+        else:
+            line.append(FEN_CONVERT_DICT[item])
+    board.append(line)
+    board.append([0, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])
+    board.reverse()
     return board
 
 
+def test_all_positions(max_depth):
+    """
+    checks all the possible combinations in a given position to see if it works
+    """
+    white_bot = ChessBot(colour='white')
+    moves = white_bot.find_moves()
+    move_combinations = []
+    for move in moves:
+        move_combinations.append([move])
+
+    print(len(move_combinations))
+    start = move_combinations
+    for depth in range(1,max_depth):
+        move_combinations = start
+        checks = 0
+        while depth > 0:
+            temp = []
+
+            for move_set in move_combinations:
+
+                if len(move_set) % 2 == 1:
+                    black_bot = ChessBot()
+                    for move in move_set:
+                        black_bot.make_move(move)
+                    if black_bot.in_check():
+                        checks += 1
+                    next_move = black_bot.find_moves()
+                else:
+                    white_bot = ChessBot(colour='white')
+                    for move in move_set:
+                        white_bot.make_move(move)
+                    next_move = white_bot.find_moves()
+                    if white_bot.in_check():
+                        checks += 1
+                for item in next_move:
+                    temp.append(move_set + [item])
+
+            move_combinations = temp
+            depth -= 1
+        print(len(move_combinations), checks)
+
+
+def play_game(colour='black'):
+    game = ChessBot(colour)
+    if colour == 'white':
+        moves = game.find_moves()
+        move = random.randint(0, len(moves) - 1)
+        print(moves[move])
+        game.make_move(moves[move])
+    while True:
+        player_move = input("Enter your move: ")
+        if player_move == 'p':
+            print(game)
+        elif player_move == 'fen':
+            print(game.produce_fen_string())
+            print(game.castling_availability)
+        else:
+            game.make_move(player_move)
+            moves = game.find_moves()
+            print(len(moves))
+            move = random.randint(0, len(moves) - 1)
+            print(moves[move])
+            game.make_move(moves[move])
+
 def main():
-    FEN = "rnb1kbnr/p1qpp1pp/1p6/7Q/5p2/4P3/PPPP1PPP/R1B1KBNR b KQkq - 1 5"
-    # FEN = None
-    game = ChessBot(FEN_string=FEN)
-    # print(game)
-    # game.make_move('e8e4')
-    # game.make_move('d1c4')
-    # game.make_move('d8d6')
-    # game.make_move('c1b4')
-    # game.make_move('e8c3')
-    game.find_moves()
-    # while True:
-    #     player_move = input("Enter your move: ")
-    #     if player_move == 'p':
-    #         print(game)
-    #     else:
-    #         game.make_move(player_move)
-    #         moves = game.find_moves()
-    #         print(len(moves))
-    #         move = random.randint(0, len(moves) - 1)
-    #         print(moves[move])
-    #         game.make_move(moves[move])
+    # test_all_positions(3)
+    # play_game("black")
+    game = ChessBot()
+    game.make_move('f1e4')
+    game.make_move('g1g4')
+    game.make_move('e1g1')
+    print(game.produce_fen_string())
+    # game.find_moves()
+    # print(game.produce_fen_string())
+    # # game.make_move('d8d6')
+    # # game.make_move('c1b4')
+    # # game.make_move('e8c3')
+    # # game.find_moves()
+
 
 
 if __name__ == "__main__":
