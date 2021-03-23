@@ -2,8 +2,9 @@
 Just a bot to play check with, ill keep working on it for fun
 might try and build an account for it and see what elo i can get it to.
 
-v0.2.0 makes random moves, can see checks
+v0.3.0 makes random moves, can see checks
 able to  castles
+completely rewrote the board and made the bot colour neutral
 no en passant
 no pawn promotions
 
@@ -13,7 +14,18 @@ import random
 
 # Important to remember that you can have multiple queens!!!
 
-
+"""
+FEN STRINGS
+lowercase is black, UPPERCASE is WHITE
+P/p = Pawn
+R/r = Rook
+N/n = Knight
+B/b = bishop
+Q/q = Queen
+K/k = king
+FEN strings display the board as a string reading left to right, top to bottom from whites perspective
+a8, b8 ... g2, h1
+"""
 FEN_STRING_START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 FEN_CONVERT_DICT = {
     'r': ('black', 'rook'), 'n': ('black', 'knight'), 'b': ('black', 'bishop'),
@@ -21,215 +33,207 @@ FEN_CONVERT_DICT = {
     'R': ('white', 'rook'), 'N': ('white', 'knight'), 'B': ('white', 'bishop'),
     'Q': ('white', 'queen'), 'K': ('white', 'king'), 'P': ('white', 'pawn'),
 }
-COORDS = {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8}
+"""use dict look ups to save time rather than doing the maths"""
+J_COORDS = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7,
+            0: 'a', 1: 'b', 2: 'c', 3: 'd', 4: 'e', 5: 'f', 6: 'g', 7: 'h'}
+I_COORDS = {'1': 7, '2': 6, '3': 5, '4': 4, '5': 3, '6': 2, '7': 1, '8': 0,
+            0: '8', 1: '7', 2: '6', 3: '5', 4: '4', 5: '3', 6: '2', 7: '1'}
 
 
 class ChessBot:
-    def __init__(self, colour='black', fen_string=FEN_STRING_START):
+    def __init__(self, fen_string=FEN_STRING_START):
         fen_string = fen_string.split(' ')
         self.board = set_up_board(fen_string[0])
-        self.colour = colour
         self.active_colour = fen_string[1]
         self.castling_availability = [] if fen_string[2] == '-' else list(fen_string[2])
         self.en_passant = fen_string[3]
         # TODO - add half-move clock and full-move number
         # These are fen_string[4 & 5]
 
-        self.positions = {'pawn': [], 'rook': [], 'knight': [], 'bishop': [], 'queen': []}
-        for i in range(1, 9):
-            for j in range(1, 9):
-                if self.board[i][j] != 'E' and self.board[i][j][0] == self.colour:
-                    position = (j, i)
-                    if self.board[i][j][1] == 'king':
-                        self.positions['king'] = position
+        self.positions = {'P': [], 'R': [], 'N': [], 'B': [], 'Q': [], 'p': [], 'r': [], 'n': [], 'b': [], 'q': []}
+        for i in range(8):
+            for j in range(8):
+                if self.board[i][j] != '_':
+                    if self.board[i][j] == 'K':
+                        self.positions['K'] = (i, j)
+                    elif self.board[i][j] == 'k':
+                        self.positions['k'] = (i, j)
                     else:
-                        self.positions[self.board[i][j][1]].append(position)
+                        self.positions[self.board[i][j]].append((i, j))
 
     def __str__(self):
         """displays the current state of the board"""
-        board = self.board
         output = ''
-        i = 8
-        while i >= 1:
-            output += str(board[i][1:])
+        for line in self.board:
+            for position in line:
+                output += position + ' '
             output += '\n'
-            i -= 1
         return output
 
     def make_move(self, move):
         """moves a piece from one coord to another"""
-        piece = self.board[int(move[1])][COORDS[move[0]]]
-        target = self.board[int(move[3])][COORDS[move[2]]]
-        self.board[int(move[1])][COORDS[move[0]]] = 'E'
-        self.board[int(move[3])][COORDS[move[2]]] = piece
+        i_1, j_1 = convert_to_i_j(move[:2])
+        i_2, j_2 = convert_to_i_j(move[2:])
+        piece = self.board[i_1][j_1]
+        target = self.board[i_2][j_2]
 
-        # If king is moved make sure castling is also removed
-        if piece[1] == 'king':
-            if piece[0] == 'white':
-                if 'K' in self.castling_availability:
-                    self.castling_availability.remove('K')
-                if 'Q' in self.castling_availability:
-                    self.castling_availability.remove('Q')
-            else:
-                if 'k' in self.castling_availability:
-                    self.castling_availability.remove('k')
-                if 'q' in self.castling_availability:
-                    self.castling_availability.remove('q')
+        # Make the move on self.board
+        self.board[i_1][j_1] = '_'
+        self.board[i_2][j_2] = piece
+
+        # Special Cases of if the king is moved/castled
+
+        if piece == 'K':
+            if 'K' in self.castling_availability:
+                self.castling_availability.remove('K')
+            if 'Q' in self.castling_availability:
+                self.castling_availability.remove('Q')
             if move == "e1g1":
                 self.make_move("h1f1")
             elif move == "e1c1":
                 self.make_move("a1d1")
-            elif move == "e8cg8":
+        elif piece == 'k':
+            if 'k' in self.castling_availability:
+                self.castling_availability.remove('k')
+            if 'q' in self.castling_availability:
+                self.castling_availability.remove('q')
+            if move == "e8cg8":
                 self.make_move("h8f8")
             elif move == "e8c8":
                 self.make_move("a8d8")
 
-        if piece[1] == 'rook' and move[:2] == 'a1' and 'Q' in self.castling_availability:
-            self.castling_availability.remove('Q')
-        elif piece[1] == 'rook' and move[:2] == 'h1' and 'K' in self.castling_availability:
-            self.castling_availability.remove('K')
-        elif piece[1] == 'rook' and move[:2] == 'a8' and 'q' in self.castling_availability:
-            self.castling_availability.remove('q')
-        elif piece[1] == 'rook' and move[:2] == 'h8' and 'k' in self.castling_availability:
-            self.castling_availability.remove('k')
+        # Stop castling if the rook is moved or captured
+        if piece in 'Rr' or target in 'Rr':
+            if piece == 'R' and move[:2] == 'a1' and 'Q' in self.castling_availability:
+                self.castling_availability.remove('Q')
+            elif piece == 'R' and move[:2] == 'h1' and 'K' in self.castling_availability:
+                self.castling_availability.remove('K')
+            elif piece == 'r' and move[:2] == 'a8' and 'q' in self.castling_availability:
+                self.castling_availability.remove('q')
+            elif piece == 'r' and move[:2] == 'h8' and 'k' in self.castling_availability:
+                self.castling_availability.remove('k')
+            # if the rook gets captured
+            elif target == 'R' and move[2:] == 'a1' and 'Q' in self.castling_availability:
+                self.castling_availability.remove('Q')
+            elif target == 'R' and move[2:] == 'h1' and 'K' in self.castling_availability:
+                self.castling_availability.remove('K')
+            elif target == 'r' and move[2:] == 'a8' and 'q' in self.castling_availability:
+                self.castling_availability.remove('q')
+            elif target == 'r' and move[2:] == 'h8' and 'k' in self.castling_availability:
+                self.castling_availability.remove('k')
 
-        if piece[0] == self.colour:
-            if piece[1] == 'king':
-                self.positions[piece[1]] = (COORDS[move[2]], int(move[3]))
-            else:
-                old = (COORDS[move[0]], int(move[1]))
-                self.positions[piece[1]].remove(old)
-                self.positions[piece[1]].append((COORDS[move[2]], int(move[3])))
-        elif target != 'E':
-            if target[1] == 'king':
-                print("you've just captured the king!")
-            else:
-                self.positions[target[1]].remove((COORDS[move[2]], int(move[3])))
+        # move the piece in self.positions
+        if piece in 'Kk':
+            self.positions[piece] = convert_to_i_j(move[2:])
+        else:
+            self.positions[piece].remove(convert_to_i_j(move[:2]))
+            self.positions[piece].append(convert_to_i_j(move[2:]))
+            if target != '_':
+                self.positions[target].remove(convert_to_i_j(move[2:]))
 
-    def make_pseudo_move(self, move):
-        """moves a piece from one coord to another"""
-        piece = self.board[int(move[1])][COORDS[move[0]]]
-        target = self.board[int(move[3])][COORDS[move[2]]]
-        self.board[int(move[1])][COORDS[move[0]]] = 'E'
-        self.board[int(move[3])][COORDS[move[2]]] = piece
-        if piece[0] == self.colour:
-            if piece[1] == 'king':
-                self.positions[piece[1]] = (COORDS[move[2]], int(move[3]))
-            else:
-                old = (COORDS[move[0]], int(move[1]))
-                self.positions[piece[1]].remove(old)
-                self.positions[piece[1]].append((COORDS[move[2]], int(move[3])))
-        elif target != 'E':
-            if target[1] == 'king':
-                print("you've just captured the king!")
-            else:
-                self.positions[target[1]].remove((COORDS[move[2]], int(move[3])))
+    def hide_piece(self, position):
+        i, j = convert_to_i_j(position)
+        self.board[i][j] = '_'
 
-    def find_moves(self):
-        in_check, squares = self.check_for_checks()
-        king_moves = self.find_king_moves()
+    def return_piece(self, position, piece):
+        i, j = convert_to_i_j(position)
+        self.board[i][j] = piece
+
+    def find_moves(self, colour):
+        if colour == 'w':
+            pieces = ['P', 'N', 'R', 'B', 'Q', 'K']
+        else:
+            pieces = ['p', 'n', 'r', 'b', 'q', 'k']
+
+        in_check, squares = self.check_for_checks(pieces)
+
+        king_moves = self.find_king_moves(pieces)
         if in_check:
             temp = []
             for move in king_moves:
-                self.make_pseudo_move(move)
-                if not self.quick_check_for_checks():
+                self.hide_piece(move[:2])
+                if not self.quick_check_for_checks(pieces, convert_to_i_j(move[2:])):
                     temp.append(move)
-                move_back = move[2:] + move[:2]
-                self.make_pseudo_move(move_back)
+                self.return_piece(move[:2], pieces[5])
             king_moves = temp
         else:
-            castling = self.check_castling()
+            castling = self.check_castling(pieces)
             king_moves += castling
 
         if in_check and not len(squares):
             return king_moves
         else:
-            valid_moves = []
-            for position in self.positions['pawn']:
-                valid_moves += (self.find_pawn_moves(position))
-            for position in self.positions['knight']:
-                valid_moves += (self.find_knight_moves(position))
-            for position in self.positions['rook']:
-                valid_moves += (self.find_piece_moves(position, 'rook'))
-            for position in self.positions['bishop']:
-                valid_moves += (self.find_piece_moves(position, 'bishop'))
-            for position in self.positions['queen']:
-                valid_moves += (self.find_piece_moves(position, 'queen'))
+            move_options = []
+            for position in self.positions[pieces[0]]:
+                move_options += self.find_pawn_moves(position, colour)
+            for position in self.positions[pieces[1]]:
+                move_options += self.find_knight_moves(position, pieces)
+            for piece in pieces[2:5]:
+                for position in self.positions[piece]:
+                    move_options += self.find_piece_moves(position, piece, pieces)
             if in_check:
                 temp = []
-                for move in valid_moves:
-                    destination = (int(move[3]), COORDS[move[2]])
-                    if destination in squares:
+                for move in move_options:
+                    if move[2:] in squares:
                         temp.append(move)
-                valid_moves = temp
-
-        # if in_check:
-        #     print("block moves!", valid_moves)
-        #     print("king moves", king_moves)
-        output = []
-        for option in valid_moves:
-            if self.in_line_with_king(option[0], option[1]):
-                self.make_pseudo_move(option)
-                in_check, squares = self.check_for_checks()
-                if not in_check:
-                    output.append(option)
-                move_back = option[2:] + option[:2]
-                self.make_pseudo_move(move_back)
+                return king_moves + temp
             else:
-                output.append(option)
+                output = []
+                for option in move_options:
+                    if in_line_with_king(self.positions[pieces[5]], option[:2]):
+                        i, j = convert_to_i_j(option[:2])
+                        target = self.board[i][j]
+                        self.hide_piece(option[:2])
+                        if not self.quick_check_for_checks(pieces, self.positions[pieces[5]]):
+                            output.append(option)
+                        self.return_piece(option[:2], target)
+                    else:
+                        output.append(option)
+                for option in king_moves:
+                    self.hide_piece(option[:2])
+                    if not self.quick_check_for_checks(pieces, convert_to_i_j(option[2:])):
+                        output.append(option)
+                    self.return_piece(option[:2], self.positions[pieces[5]])
+                return output
 
-        for option in king_moves:
-            self.make_pseudo_move(option)
-            if not self.quick_check_for_checks():
-                output.append(option)
-            move_back = option[2:] + option[:2]
-            self.make_pseudo_move(move_back)
-        return output
-
-    def in_check(self):
-        return self.quick_check_for_checks()
-
-    def check_castling(self):
+    def check_castling(self, pieces):
         """
         check if the pieces haven't moved
         check there is no pieces blocking the castle
         check the 2 other squares for checks
         """
         output = []
-        if self.colour == 'white':
+        if pieces[5] == 'K':
             if 'K' in self.castling_availability:
-                if self.squares_empty([(1, 6), (1, 7)]):
-                    if self.castling_king_safety(['e1f1', 'e1g1']):
+                if self.squares_empty([(0, 5), (0, 6)]):
+                    if self.castling_king_safety(['f1', 'g1'], pieces):
                         output.append('e1g1')
 
             if 'Q' in self.castling_availability:
-                if self.squares_empty([(1, 4), (1, 3), (1, 2)]):
-                    if self.castling_king_safety(['e1d1', 'e1c1']):
+                if self.squares_empty([(0, 3), (0, 2), (0, 1)]):
+                    if self.castling_king_safety(['d1', 'c1'], pieces):
                         output.append('e1c1')
         else:
             if 'k' in self.castling_availability:
-                if self.squares_empty([(8, 6), (8, 7)]):
-                    if self.castling_king_safety(['e8f8', 'e8g8']):
+                if self.squares_empty([(7, 5), (7, 6)]):
+                    if self.castling_king_safety(['f8', 'g8'], pieces):
                         output.append('e8g8')
             if 'q' in self.castling_availability:
-                if self.squares_empty([(8, 4), (8, 3), (8, 2)]):
-                    if self.castling_king_safety(['e8d8', 'e8c8']):
+                if self.squares_empty([(7, 3), (7, 2), (7, 1)]):
+                    if self.castling_king_safety(['d8', 'c8'], pieces):
                         output.append('e8c8')
         return output
 
     def squares_empty(self, location_list):
         for location in location_list:
-            if self.board[location[0]][location[1]] != 'E':
+            if self.board[location[0]][location[1]] != '_':
                 return False
         return True
 
-    def castling_king_safety(self, moves):
+    def castling_king_safety(self, moves, pieces):
         for move in moves:
-            self.make_pseudo_move(move)
-            if self.in_check():
+            if self.quick_check_for_checks(pieces, move):
                 return False
-            move_back = move[2:] + move[:2]
-            self.make_pseudo_move(move_back)
         return True
 
     def produce_fen_string(self):
@@ -287,137 +291,130 @@ class ChessBot:
         output += ' ' + self.en_passant
         return output
 
-    def find_pawn_moves(self, position):
-        j, i = position
-        valid_moves = []
-        if self.colour == 'black':
-            # pawn advance
-            if self.board[i - 1][j] == 'E':
-                move = self.board[0][j] + str(i) + self.board[0][j] + str(i - 1)
-                valid_moves.append(move)
-            if i == 7 and self.board[i - 2][j] == 'E' and self.board[i - 1][j] == 'E':
-                move = self.board[0][j] + str(i) + self.board[0][j] + str(i - 2)
-                valid_moves.append(move)
-
-            # pawn take
-            if j != 1:
-                if len(self.board[i - 1][j - 1]) == 2 and self.board[i - 1][j - 1][0] == 'white':
-                    move = self.board[0][j] + str(i) + self.board[0][j - 1] + str(i - 1)
-                    valid_moves.append(move)
-            if j != 8:
-                if len(self.board[i - 1][j + 1]) == 2 and self.board[i - 1][j + 1][0] == 'white':
-                    move = self.board[0][j] + str(i) + self.board[0][j + 1] + str(i - 1)
-                    valid_moves.append(move)
+    def find_pawn_moves(self, position, colour):
+        i, j = position
+        possible_moves = []
+        # TODO pawn promotions
+        if colour == 'w':
+            # Pawn advance 1 square
+            if i > 0 and self.board[i - 1][j] == '_':
+                possible_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(i - 1, j))
+            # Pawn advance 2 squares
+            if i == 6 and self.board[i - 1][j] == '_' and self.board[i - 2][j] == '_':
+                possible_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(i - 2, j))
+            # Pawn take left
+            if j > 0 and i > 0 and self.board[i - 1][j - 1] in 'prnbq':
+                possible_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(i - 1, j - 1))
+            # Pawn take right
+            if j < 7 and i > 0 and self.board[i - 1][j + 1] in 'prnbq':
+                possible_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(i - 1, j + 1))
         else:
-            # pawn advance
-            if self.board[i + 1][j] == 'E':
-                move = self.board[0][j] + str(i) + self.board[0][j] + str(i + 1)
-                valid_moves.append(move)
-            if i == 2 and self.board[i + 2][j] == 'E' and self.board[i + 1][j] == 'E':
-                move = self.board[0][j] + str(i) + self.board[0][j] + str(i + 2)
-                valid_moves.append(move)
+            # Pawn advance 1 square
+            if i < 7 and self.board[i + 1][j] == '_':
+                possible_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(i + 1, j))
+            # Pawn advance 2 squares
+            if i == 1 and self.board[i + 1][j] == '_' and self.board[i + 2][j] == '_':
+                possible_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(i + 2, j))
+            # Pawn take left
+            if j > 0 and i < 7 and self.board[i + 1][j - 1] in 'PRNBQ':
+                possible_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(i + 1, j - 1))
+            # Pawn take right
+            if j < 7 and i < 7 and self.board[i + 1][j + 1] in 'PRNBQ':
+                possible_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(i + 1, j + 1))
+        return possible_moves
 
-            # pawn take
-            if j != 1:
-                if len(self.board[i + 1][j - 1]) == 2 and self.board[i + 1][j - 1][0] == 'black':
-                    move = self.board[0][j] + str(i) + self.board[0][j - 1] + str(i + 1)
-                    valid_moves.append(move)
-            if j != 8:
-                if len(self.board[i + 1][j + 1]) == 2 and self.board[i + 1][j + 1][0] == 'black':
-                    move = self.board[0][j] + str(i) + self.board[0][j + 1] + str(i + 1)
-                    valid_moves.append(move)
+    def find_piece_moves(self, position, piece, pieces):
+        i, j = position
 
-        return valid_moves
-
-    def find_piece_moves(self, position, piece):
-        j, i = position
-        if piece == "rook":
+        if piece in "Rr":
             directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
-        elif piece == "bishop":
+        elif piece in "Bb":
             directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
         else:
             directions = [(0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]
 
-        valid_moves = []
+        possible_moves = []
         for direction in directions:
             ii = i + direction[0]
             jj = j + direction[1]
-            while 1 <= ii <= 8 and 1 <= jj <= 8:
-                if self.board[ii][jj] == 'E':
+            while 0 <= ii <= 7 and 0 <= jj <= 7:
+                if self.board[ii][jj] == '_':
                     # free square to move to
-                    move = self.board[0][j] + str(i) + self.board[0][jj] + str(ii)
-                    valid_moves.append(move)
-                elif self.board[ii][jj][0] == self.colour:
+                    possible_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(ii, jj))
+                elif self.board[ii][jj] in pieces:
                     # hit a piece of the same colour
                     break
                 else:
                     # capture a piece
-                    move = self.board[0][j] + str(i) + self.board[0][jj] + str(ii)
-                    valid_moves.append(move)
+                    possible_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(ii, jj))
                     break
                 ii += direction[0]
                 jj += direction[1]
-        return valid_moves
+        return possible_moves
 
-    def find_knight_moves(self, position):
-        j, i = position
-        valid_moves = []
+    def find_knight_moves(self, position, pieces):
+        i, j = position
+        possible_moves = []
         options = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]
         for move in options:
             ii = i + move[0]
             jj = j + move[1]
-            if (1 <= ii <= 8) and (1 <= jj <= 8):
-                if self.board[ii][jj] == 'E' or self.board[ii][jj][0] != self.colour:
-                    valid_moves.append(self.board[0][j] + str(i) + self.board[0][jj] + str(ii))
+            if (0 <= ii <= 7) and (0 <= jj <= 7):
+                if self.board[ii][jj] == '_' or self.board[ii][jj] not in pieces:
+                    possible_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(ii, jj))
+        return possible_moves
 
-        return valid_moves
-
-    def find_king_moves(self):
-        j, i = self.positions['king']
+    def find_king_moves(self, pieces):
+        i, j = self.positions[pieces[5]]
         valid_moves = []
         for ii in [-1, 0, 1]:
             for jj in [-1, 0, 1]:
                 if ii == 0 and jj == 0:
                     pass
                 else:
-                    if (1 <= (i + ii) <= 8) and (1 <= (j + jj) <= 8):
-                        if self.board[i+ii][j+jj] == 'E' or self.board[i+ii][j+jj][0] != self.colour:
-                            valid_moves.append(self.board[0][j] + str(i) + self.board[0][j+jj] + str(i+ii))
-
+                    if (0 <= (i + ii) <= 7) and (0 <= (j + jj) <= 7):
+                        if self.board[i + ii][j + jj] == '_' or self.board[i + ii][j + jj] not in pieces:
+                            valid_moves.append(convert_to_chess_coords(i, j) + convert_to_chess_coords(i + ii, j + jj))
         return valid_moves
 
-    def check_for_checks(self):
+    def check_for_checks(self, pieces):
         """
         checks to see in the king in is check
         -Check if any pawns attack the king first as it is not possible to create a double check involving a pawn.
         -Check knights, then horizontal/vertical then diagonals
         """
 
+        i, j = self.positions[pieces[5]]
+        if pieces[5] == 'K':
+            opponent_knight = 'n'
+        else:
+            opponent_knight = 'N'
+
         # Check for checks using a pawn.
-        j, i = self.positions['king']
-        if self.colour == "black" and i > 1:
-            if j > 1 and self.board[i - 1][j - 1] != 'E' and self.board[i - 1][j - 1] == ('white', 'pawn'):
-                return True, [(i - 1, j - 1)]
-            if j < 8 and self.board[i - 1][j + 1] != 'E' and self.board[i - 1][j + 1] == ('white', 'pawn'):
-                return True, [(i - 1, j + 1)]
-        elif self.colour == "white" and i < 8:
-            if j > 1 and self.board[i + 1][j - 1] != 'E' and self.board[i + 1][j - 1] == ('black', 'pawn'):
-                return True, [(i + 1, j - 1)]
-            if j < 8 and self.board[i + 1][j + 1] != 'E' and self.board[i + 1][j + 1] == ('black', 'pawn'):
-                return True, [(i + 1, j + 1)]
+        if pieces[5] == 'K' and i > 1:
+            if j > 0 and self.board[i - 1][j - 1] == 'p':
+                return True, [convert_to_chess_coords(i - 1, j - 1)]
+            elif j < 7 and self.board[i - 1][j + 1] == 'p':
+                return True, [convert_to_chess_coords(i - 1, j + 1)]
+        elif pieces[5] == 'k' and i < 6:
+            if j > 0 and self.board[i + 1][j - 1] == 'P':
+                return True, [convert_to_chess_coords(i + 1, j - 1)]
+            elif j < 7 and self.board[i + 1][j + 1] == 'P':
+                return True, [convert_to_chess_coords(i + 1, j + 1)]
 
         # available squares that could be used to block the check
         blocking_squares = []
+
         # checks knights
         check_k = False
         options = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]
         for move in options:
             ii = i + move[0]
             jj = j + move[1]
-            if (1 <= ii <= 8) and (1 <= jj <= 8):
-                if self.board[ii][jj] != 'E' and self.board[ii][jj][0] != self.colour and self.board[ii][jj][1] == 'knight':
+            if (0 <= ii <= 7) and (0 <= jj <= 7):
+                if self.board[ii][jj] == opponent_knight:
                     check_k = True
-                    blocking_squares = [(ii, jj)]
+                    blocking_squares = [convert_to_chess_coords(ii, jj)]
 
         check_hv = False
 
@@ -426,17 +423,17 @@ class ChessBot:
             temp = []
             ii = i + combination[0]
             jj = j + combination[1]
-            while 1 <= jj <= 8 and 1 <= ii <= 8:
-                if self.board[ii][jj] == 'E':
-                    temp.append((ii, jj))
+            while 0 <= jj <= 7 and 0 <= ii <= 7:
+                if self.board[ii][jj] == '_':
+                    temp.append(convert_to_chess_coords(ii, jj))
                     ii += combination[0]
                     jj += combination[1]
-                elif self.board[ii][jj][0] == self.colour:
+                elif self.board[ii][jj] in pieces:
                     break
-                elif self.board[ii][jj][1] in ['pawn', 'king', 'knight', 'bishop']:
+                elif self.board[ii][jj] in 'PpKkNnBb':
                     break
                 else:
-                    temp.append((ii, jj))
+                    temp.append(convert_to_chess_coords(ii, jj))
                     check_hv = True
                     break
             if check_hv:
@@ -452,17 +449,17 @@ class ChessBot:
             temp = []
             ii = i + combination[0]
             jj = j + combination[1]
-            while 1 <= jj <= 8 and 1 <= ii <= 8:
-                if self.board[ii][jj] == 'E':
-                    temp.append((ii, jj))
+            while 0 <= jj <= 7 and 0 <= ii <= 7:
+                if self.board[ii][jj] == '_':
+                    temp.append(convert_to_chess_coords(ii, jj))
                     ii += combination[0]
                     jj += combination[1]
-                elif self.board[ii][jj][0] == self.colour:
+                elif self.board[ii][jj] in pieces:
                     break
-                elif self.board[ii][jj][1] in ['pawn', 'king', 'knight', 'rook']:
+                elif self.board[ii][jj] in 'PpKkNnRr':
                     break
                 else:
-                    temp.append((ii, jj))
+                    temp.append(convert_to_chess_coords(ii, jj))
                     check_d = True
                     break
             if check_d:
@@ -475,45 +472,51 @@ class ChessBot:
         else:
             return False, []
 
-    def quick_check_for_checks(self):
+    def quick_check_for_checks(self, pieces, position):
         """
         checks to see in the king in is check
         faster than other check for check because it doesnt care about
         double checks or blocking squares
         """
-        j, i = self.positions['king']
+        i, j = position
+        if pieces[5] == 'K':
+            opponent_knight = 'n'
+        else:
+            opponent_knight = 'N'
         # Check for checks using a pawn.
+        if pieces[5] == 'K' and i > 1:
+            if j > 0 and self.board[i - 1][j - 1] == 'p':
+                return True
+            elif j < 7 and self.board[i - 1][j + 1] == 'p':
+                return True
+        elif pieces[5] == 'k' and i < 6:
+            if j > 0 and self.board[i + 1][j - 1] == 'P':
+                return True
+            elif j < 7 and self.board[i + 1][j + 1] == 'P':
+                return True
 
-        if self.colour == "black" and i > 1:
-            if j > 1 and self.board[i - 1][j - 1] != 'E' and self.board[i - 1][j - 1] == ('white', 'pawn'):
-                return True
-            if j < 8 and self.board[i - 1][j + 1] != 'E' and self.board[i - 1][j + 1] == ('white', 'pawn'):
-                return True
-        elif self.colour == "white" and i < 8:
-            if j > 1 and self.board[i + 1][j - 1] != 'E' and self.board[i + 1][j - 1] == ('black', 'pawn'):
-                return True
-            if j < 8 and self.board[i + 1][j + 1] != 'E' and self.board[i + 1][j + 1] == ('black', 'pawn'):
-                return True
         # checks knights
         options = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]
         for move in options:
             ii = i + move[0]
             jj = j + move[1]
-            if (1 <= ii <= 8) and (1 <= jj <= 8):
-                if self.board[ii][jj] != 'E' and self.board[ii][jj][0] != self.colour and self.board[ii][jj][1] == 'knight':
+            if (0 <= ii <= 7) and (0 <= jj <= 7):
+                if self.board[ii][jj] == opponent_knight:
                     return True
 
         # Checks Horizontal and Vertical positions
         for combination in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+            temp = []
             ii = i + combination[0]
             jj = j + combination[1]
-            while 1 <= jj <= 8 and 1 <= ii <= 8:
-                if self.board[ii][jj] == 'E':
+            while 0 <= jj <= 7 and 0 <= ii <= 7:
+                if self.board[ii][jj] == '_':
+                    temp.append(convert_to_chess_coords(ii, jj))
                     ii += combination[0]
                     jj += combination[1]
-                elif self.board[ii][jj][0] == self.colour:
+                elif self.board[ii][jj] in pieces:
                     break
-                elif self.board[ii][jj][1] in ['pawn', 'king', 'knight', 'bishop']:
+                elif self.board[ii][jj] in 'PpKkNnBb':
                     break
                 else:
                     return True
@@ -522,26 +525,26 @@ class ChessBot:
         for combination in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
             ii = i + combination[0]
             jj = j + combination[1]
-            while 1 <= jj <= 8 and 1 <= ii <= 8:
-                if self.board[ii][jj] == 'E':
+            while 0 <= jj <= 7 and 0 <= ii <= 7:
+                if self.board[ii][jj] == '_':
                     ii += combination[0]
                     jj += combination[1]
-                elif self.board[ii][jj][0] == self.colour:
+                elif self.board[ii][jj] in pieces:
                     break
-                elif self.board[ii][jj][1] in ['pawn', 'king', 'knight', 'rook']:
+                elif self.board[ii][jj] in 'PpKkNnRr':
                     break
                 else:
                     return True
         return False
 
-    def in_line_with_king(self, i, j):
-        i = COORDS[i]
-        j = int(j)
-        king_i, king_j = self.positions['king']
-        if i == king_i or j == king_j or abs(i - king_i) == abs(j - king_j):
-            return True
-        else:
-            return False
+
+def in_line_with_king(king, piece):
+    i, j = convert_to_i_j(piece)
+    king_i, king_j = king
+    if i == king_i or j == king_j or abs(i - king_i) == abs(j - king_j):
+        return True
+    else:
+        return False
 
 
 def set_up_board(fen_string):
@@ -551,22 +554,26 @@ def set_up_board(fen_string):
     where file is a number a = 1, b = 2 etc...
     """
     board = []
-    rank = 8
-    line = [rank]
+    rank = []
     for item in fen_string:
         if item == '/':
-            board.append(line)
-            rank -= 1
-            line = [rank]
+            board.append(rank)
+            rank = []
         elif item in '12345678':
             for i in range(int(item)):
-                line.append('E')
+                rank.append('_')
         else:
-            line.append(FEN_CONVERT_DICT[item])
-    board.append(line)
-    board.append([0, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])
-    board.reverse()
+            rank.append(item)
+    board.append(rank)
     return board
+
+
+def convert_to_chess_coords(i, j):
+    return J_COORDS[j] + I_COORDS[i]
+
+
+def convert_to_i_j(chess_coords):
+    return I_COORDS[chess_coords[1]], J_COORDS[chess_coords[0]]
 
 
 def perft(max_depth):
@@ -581,15 +588,8 @@ def perft(max_depth):
     # promotions = 0
     # checks = 0
     # check_mates = 0
-    #
-    # for depth in range(0, max_depth + 1):
-    #     for move in moves:
-    #         pass
-    #     print("Depth: {}, Nodes = {}, Captures = {}, E.p. = {}, Castles = {}, Checks = {}, Checkmates = {}"
-    #           .format(depth, len(moves), captures, en_passant, castles, checks, check_mates))
-
-    white_bot = ChessBot(colour='white')
-    moves = white_bot.find_moves()
+    bot = ChessBot()
+    moves = bot.find_moves('w')
     move_combinations = []
     for move in moves:
         move_combinations.append([move])
@@ -598,32 +598,22 @@ def perft(max_depth):
     start = move_combinations
     for depth in range(1, max_depth):
         move_combinations = start
-        checks = 0
         while depth > 0:
             temp = []
-
             for move_set in move_combinations:
-
+                bot = ChessBot()
+                for move in move_set:
+                    bot.make_move(move)
                 if len(move_set) % 2 == 1:
-                    black_bot = ChessBot()
-                    for move in move_set:
-                        black_bot.make_move(move)
-                    if black_bot.in_check():
-                        checks += 1
-                    next_move = black_bot.find_moves()
+                    next_move = bot.find_moves('b')
                 else:
-                    white_bot = ChessBot(colour='white')
-                    for move in move_set:
-                        white_bot.make_move(move)
-                    next_move = white_bot.find_moves()
-                    if white_bot.in_check():
-                        checks += 1
+                    next_move = bot.find_moves('w')
                 for item in next_move:
                     temp.append(move_set + [item])
 
             move_combinations = temp
             depth -= 1
-        print(len(move_combinations), checks)
+        print(len(move_combinations))
 
 
 def play_game(colour='black'):
@@ -653,10 +643,13 @@ def main():
     perft(5)
     # play_game("white")
     # game = ChessBot()
-    # game.make_move('f1e4')
-    # game.make_move('g1g4')
+
+    # game.make_move('b7b5')
+    # game.make_move('a2a4')
+    # game.make_move('b1d6')
+    # print(game)
     # game.make_move('e1g1')
-    # print(game.find_moves())
+    # print(game.find_moves('w'))
     # print(game.produce_fen_string())
     # # game.make_move('d8d6')
     # # game.make_move('c1b4')
